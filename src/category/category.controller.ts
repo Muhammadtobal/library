@@ -7,6 +7,7 @@ import {
   Param,
   Delete,
   Query,
+  Put,
 } from '@nestjs/common';
 import { CategoryService } from './category.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
@@ -47,20 +48,35 @@ export class CategoryController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.categoryService.findOne(+id);
+  async findOne(@Param('id') id: number) {
+    const result = await this.categoryService.findOne(id);
+
+    return {
+      message: 'category fetched successfully',
+      success: true,
+      data: result,
+    };
   }
 
-  @Patch(':id')
-  update(
-    @Param('id') id: string,
+  @Put(':id')
+  async update(
+    @Param('id') id: number,
     @Body() updateCategoryDto: UpdateCategoryDto,
   ) {
-    return this.categoryService.update(+id, updateCategoryDto);
+    const result = await this.categoryService.update(id, updateCategoryDto);
+    return {
+      message: 'category update successfully',
+      success: true,
+      data: result,
+    };
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.categoryService.remove(+id);
+  async remove(@Param('id') id: number) {
+    await this.categoryService.remove(id);
+    return {
+      message: 'category delete successfully',
+      success: true,
+    };
   }
 }

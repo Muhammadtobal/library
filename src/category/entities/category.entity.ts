@@ -1,5 +1,12 @@
 import { Book } from 'src/book/entities/book.entity';
-import { Column, Entity, OneToMany, PrimaryGeneratedColumn } from 'typeorm';
+import {
+  Column,
+  CreateDateColumn,
+  Entity,
+  OneToMany,
+  PrimaryGeneratedColumn,
+  UpdateDateColumn,
+} from 'typeorm';
 
 @Entity('categories')
 export class Category {
@@ -7,12 +14,11 @@ export class Category {
   id: number;
   @Column()
   name: string;
-  @Column()
-  description: string;
+
   @OneToMany(() => Book, (book) => book.category)
   books: Book;
-  @Column()
+  @CreateDateColumn()
   created_at: Date;
-  @Column()
+  @UpdateDateColumn()
   updated_at: Date;
 }
