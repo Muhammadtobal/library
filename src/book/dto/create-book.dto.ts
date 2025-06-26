@@ -20,7 +20,7 @@ export class CreateBookDto {
   @IsString()
   size?: string;
 
-  @IsString()
+  @IsNumber()
   @IsNotEmpty()
-  Number_pages!: string;
+  Number_pages!: number;
 }

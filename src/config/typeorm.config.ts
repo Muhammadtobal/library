@@ -2,6 +2,9 @@ import { config } from 'dotenv';
 import { Author } from 'src/author/entities/author.entity';
 import { Book } from 'src/book/entities/book.entity';
 import { Category } from 'src/category/entities/category.entity';
+import { MyLibrary } from 'src/my-library/entities/my-library.entity';
+import { Review } from 'src/review/entities/review.entity';
+import { User } from 'src/user/entities/user.entity';
 import { DataSource } from 'typeorm';
 config();
 
@@ -13,7 +16,7 @@ const AppDataSource = new DataSource({
   username: process.env.DB_USERNAME,
   password: process.env.DB_PASSWORD,
   database: process.env.DB_DATABASE,
-  entities: [Category, Author, Book],
+  entities: [Category, Author, Book, User, MyLibrary, Review],
   migrations: [isCompiled ? 'dist/migrations/*.js' : 'src/migrations/*.ts'],
 
   synchronize: false,

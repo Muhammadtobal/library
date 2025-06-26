@@ -43,7 +43,7 @@ export class CategoryService {
     return { data, pagination };
   }
 
-  async findOne(id: number): Promise<Category> {
+  async findOne(id: any): Promise<Category> {
     const getOne = await this.categoryRepository.findOne({ where: { id } });
     if (!getOne) {
       throw new NotFoundException(`the category not found`);
@@ -69,5 +69,16 @@ export class CategoryService {
       throw new NotFoundException(`the category not found`);
     }
     await this.categoryRepository.remove(getOne);
+  }
+  async findCategory(category: any): Promise<Category | null> {
+    const getOne = await this.categoryRepository.findOne({
+      where: {
+        id: category.id,
+      },
+    });
+    if (!getOne) {
+      throw new NotFoundException(`the category not found`);
+    }
+    return getOne;
   }
 }
