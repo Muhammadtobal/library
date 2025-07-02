@@ -20,7 +20,7 @@ export class Author {
   bio?: string;
 
   @OneToMany(() => Book, (book) => book.author)
-  books: Book;
+  books: Book[];
   @Column({ type: 'varchar', nullable: true })
   image?: string;
   @CreateDateColumn()

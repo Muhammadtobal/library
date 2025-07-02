@@ -7,7 +7,9 @@ export class CreateBookDto {
 
   @IsNumber()
   categoryId!: number;
-
+  @IsOptional()
+  @IsString()
+  image?: string;
   @IsNumber()
   authorId!: number;
   @IsOptional()

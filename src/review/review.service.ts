@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { CreateReviewDto } from './dto/create-review.dto';
 import { UpdateReviewDto } from './dto/update-review.dto';
 import { Review } from './entities/review.entity';
@@ -6,6 +6,8 @@ import { MyLibraryService } from 'src/my-library/my-library.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BookService } from 'src/book/book.service';
+import { PaginationQueryDto } from 'src/utils/paginateDto';
+import { paginate } from 'src/utils/paginate';
 @Injectable()
 export class ReviewService {
   constructor(
@@ -30,19 +32,47 @@ export class ReviewService {
     return await this.reviewRepository.save(result);
   }
 
-  findAll() {
-    return `This action returns all review`;
+  async findAll(
+    paginationQueryDto: PaginationQueryDto,
+    filters: any,
+  ): Promise<{ data: Review[]; pagination: any }> {
+    let { page, order, limit, sortBy, allData } = paginationQueryDto;
+    page = Number(page) || 1;
+    limit = Number(limit) || 10;
+    const sortField = sortBy || 'id';
+
+    const sort: Record<string, 'ASC' | 'DESC'> = {
+      [sortField]: order === 'asc' ? 'ASC' : 'DESC',
+    };
+
+    const { data, pagination } = await paginate<Review>(
+      this.reviewRepository,
+      ['myLibrary', 'book'],
+      page,
+      limit,
+      allData,
+      filters,
+      sort,
+    );
+    return { data, pagination };
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} review`;
+  async findOne(id: number): Promise<Review> {
+    const getOne = await this.reviewRepository.findOne({ where: { id } });
+    if (!getOne) {
+      throw new NotFoundException('the Review Not Found ');
+    }
+    return getOne;
   }
 
-  update(id: number, updateReviewDto: UpdateReviewDto) {
-    return `This action updates a #${id} review`;
+  async update(id: number, updateReviewDto: UpdateReviewDto): Promise<Review> {
+    const getOne = await this.findOne(id);
+    const updateData = Object.assign(getOne, updateReviewDto);
+    return await this.reviewRepository.save(updateData);
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} review`;
+  async remove(id: number): Promise<void> {
+    const getOne = await this.findOne(id);
+    await this.reviewRepository.remove(getOne);
   }
 }

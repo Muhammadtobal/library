@@ -16,7 +16,7 @@ export class Category {
   name: string;
 
   @OneToMany(() => Book, (book) => book.category)
-  books: Book;
+  books: Book[];
   @CreateDateColumn()
   created_at: Date;
   @UpdateDateColumn()

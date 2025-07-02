@@ -8,20 +8,28 @@ import {
   Delete,
   Query,
   Put,
+  UseInterceptors,
+  UploadedFile,
 } from '@nestjs/common';
 import { BookService } from './book.service';
 import { CreateBookDto } from './dto/create-book.dto';
 import { UpdateBookDto } from './dto/update-book.dto';
 import { PaginationQueryDto } from 'src/utils/paginateDto';
 import { read } from 'fs';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { uploadImage } from 'src/utils/multer.options';
 
 @Controller('books')
 export class BookController {
   constructor(private readonly bookService: BookService) {}
 
   @Post()
-  async create(@Body() createBookDto: CreateBookDto) {
-    const result = await this.bookService.create(createBookDto);
+  @UseInterceptors(FileInterceptor('image', uploadImage('books', 'book')))
+  async create(
+    @Body() createBookDto: CreateBookDto,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    const result = await this.bookService.create(createBookDto, file?.filename);
 
     return {
       message: 'book created successfully',
@@ -59,8 +67,17 @@ export class BookController {
   }
 
   @Put(':id')
-  async update(@Param('id') id: number, @Body() updateBookDto: UpdateBookDto) {
-    const result = await this.bookService.update(id, updateBookDto);
+  @UseInterceptors(FileInterceptor('image', uploadImage('books', 'book')))
+  async update(
+    @Param('id') id: number,
+    @Body() updateBookDto: UpdateBookDto,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    const result = await this.bookService.update(
+      id,
+      updateBookDto,
+      file?.filename,
+    );
     return {
       message: 'book updated successfully',
       success: true,
@@ -76,4 +93,16 @@ export class BookController {
       success: true,
     };
   }
+  // @Get('countBook/:id')
+  // async allBookByAuthor(
+  //   @Param('id') id: number,
+  //   @Query('sortBy') sortBy: 'rating' | 'latest',
+  // ) {
+  //   const result = await this.bookService.countBook(id);
+  //   return {
+  //     message: 'book fetched successfully',
+  //     success: true,
+  //     data: result.AllBooks,
+  //   };
+  // }
 }

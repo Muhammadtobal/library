@@ -14,6 +14,7 @@ import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { PaginationQueryDto } from 'src/utils/paginateDto';
 import { filter } from 'rxjs/operators';
+import { Category } from './entities/category.entity';
 
 @Controller('categories')
 export class CategoryController {
@@ -33,7 +34,7 @@ export class CategoryController {
   async findAll(
     @Query() queryParams: any,
     @Query() paginationQueryDto: PaginationQueryDto,
-  ) {
+  ): Promise<any> {
     const { allData, sortBy, page, limit, order, ...filters } = queryParams;
     const { data, pagination } = await this.categoryService.findAll(
       paginationQueryDto,
@@ -48,8 +49,11 @@ export class CategoryController {
   }
 
   @Get(':id')
-  async findOne(@Param('id') id: number) {
-    const result = await this.categoryService.findOne(id);
+  async findOne(
+    @Param('id') id: number,
+    @Query('sortBy') sortBy: 'rating' | 'latest',
+  ) {
+    const result = await this.categoryService.findOne(id, sortBy);
 
     return {
       message: 'category fetched successfully',

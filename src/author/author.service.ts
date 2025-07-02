@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  forwardRef,
+  Inject,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { CreateAuthorDto } from './dto/create-author.dto';
 import { UpdateAuthorDto } from './dto/update-author.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -6,14 +11,19 @@ import { Author } from './entities/author.entity';
 import { Repository } from 'typeorm';
 import { PaginationQueryDto } from 'src/utils/paginateDto';
 import { paginate } from 'src/utils/paginate';
-import { join } from 'path';
+import { basename, join } from 'path';
 import { unlink } from 'fs/promises';
-type AuthorWithImage = Author & { image: string | null | undefined };
+import { BookService } from 'src/book/book.service';
+type AuthorWithImage = Author & { image: string | null | undefined } & {
+  total: any;
+};
 @Injectable()
 export class AuthorService {
   constructor(
     @InjectRepository(Author)
     private readonly authorRepository: Repository<Author>,
+    @Inject(forwardRef(() => BookService))
+    private readonly bookService: BookService,
   ) {}
   async create(
     createAuthorDto: CreateAuthorDto,
@@ -29,7 +39,7 @@ export class AuthorService {
   async findAll(
     paginationQueryDto: PaginationQueryDto,
     filters: any,
-  ): Promise<{ data: AuthorWithImage[]; pagination: any }> {
+  ): Promise<{ data: Author[]; pagination: any }> {
     let { page, order, limit, sortBy, allData } = paginationQueryDto;
     page = Number(page) || 1;
     limit = Number(limit) || 10;
@@ -38,6 +48,7 @@ export class AuthorService {
     const sort: Record<string, 'ASC' | 'DESC'> = {
       [sortField]: order === 'asc' ? 'ASC' : 'DESC',
     };
+
     const { data, pagination } = await paginate<Author>(
       this.authorRepository,
       ['books'],
@@ -49,15 +60,31 @@ export class AuthorService {
     );
     const host = process.env.APP_URL || 'http://localhost';
     const port = process.env.PORT || 3000;
-    const updateData = data.map((i) => ({
-      ...i,
-      image: i.image ? `${host}:${port}/uploads/authors/${i.image}` : undefined,
-    }));
+
+    const updateData = await Promise.all(
+      data.map(async (i) => {
+        return {
+          ...i,
+          image: i.image
+            ? `${host}:${port}/uploads/authors/${i.image}`
+            : undefined,
+          total: i.books.length,
+        };
+      }),
+    );
+
     return { data: updateData, pagination };
   }
 
-  async findOne(id: number): Promise<Author> {
-    const getOne = await this.authorRepository.findOne({ where: { id } });
+  async findOne(
+    id: number,
+    sortBy: 'rating' | 'latest' = 'rating',
+  ): Promise<Author> {
+    const getOne = await this.authorRepository.findOne({
+      where: { id },
+      relations: ['books'],
+      order: sortBy === 'latest' ? { created_at: 'DESC' } : undefined,
+    });
     if (!getOne) {
       throw new NotFoundException('the Author Not Found');
     }
@@ -69,7 +96,36 @@ export class AuthorService {
         ? `${host}:${port}/uploads/authors/${getOne.image}`
         : undefined,
     };
-    return updateData;
+    const ratedBooks = await this.bookService.countBook(getOne.books);
+
+    let booksWithRating = ratedBooks.AllBooks.map((item) => ({
+      ...item.book,
+      averageRating: item.averageRating,
+    }));
+
+    if (sortBy === 'latest') {
+      booksWithRating = booksWithRating.sort(
+        (a, b) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      );
+    } else if (sortBy === 'rating') {
+      booksWithRating = booksWithRating.sort(
+        (a, b) => b.averageRating - a.averageRating,
+      );
+    } else {
+      booksWithRating = booksWithRating;
+    }
+    const object = {
+      id: getOne.id,
+      name: getOne.name,
+      bio: getOne.bio,
+      image: updateData.image,
+      books: booksWithRating,
+      created_at: getOne.created_at,
+      updated_at: getOne.updated_at,
+      totalBook: booksWithRating.length,
+    };
+    return object;
   }
 
   async update(
@@ -77,20 +133,25 @@ export class AuthorService {
     updateAuthorDto: UpdateAuthorDto,
     imagFile: string,
   ): Promise<Author> {
-    const getOne = await this.authorRepository.findOne({ where: { id } });
+    const getOne = await this.findOne(id);
+    if (!updateAuthorDto) {
+      return getOne;
+    }
     if (!getOne) {
       throw new NotFoundException('the Author Not Found');
     }
     if (imagFile && imagFile !== undefined) {
       const oldImage = getOne.image;
+
       if (oldImage) {
+        const imageName = basename(oldImage);
         const imagePath = join(
           __dirname,
           '..',
           '..',
           'uploads',
           'authors',
-          oldImage,
+          imageName,
         );
 
         try {

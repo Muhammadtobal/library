@@ -47,6 +47,8 @@ export class Book {
   displayType: DisplayType;
   @OneToMany(() => Review, (review) => review.book)
   reviews: Review;
+  @Column({ type: 'varchar', nullable: true })
+  image?: string;
   @CreateDateColumn()
   created_at: Date;
   @UpdateDateColumn()
