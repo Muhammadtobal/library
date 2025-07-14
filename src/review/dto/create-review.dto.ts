@@ -1,8 +1,16 @@
-import { IsInt, IsNotEmpty, IsString, Min, Max } from 'class-validator';
+import {
+  IsInt,
+  IsNotEmpty,
+  IsString,
+  Min,
+  Max,
+  IsOptional,
+} from 'class-validator';
+import { IsNull } from 'typeorm';
 
 export class CreateReviewDto {
   @IsInt()
-  @IsNotEmpty()
+  @IsOptional()
   myLibraryId: number;
 
   @IsInt()

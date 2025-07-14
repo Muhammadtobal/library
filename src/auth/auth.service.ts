@@ -34,7 +34,9 @@ export class AuthService {
     });
 
     const savedUser = await this.userRepository.save(newUser);
-    await this.myLibraryService.create(savedUser.id);
+    if (savedUser.role !== 'admin')
+      await this.myLibraryService.create(savedUser.id);
+
     const { password, ...userWithoutPassword } = savedUser;
 
     return userWithoutPassword;

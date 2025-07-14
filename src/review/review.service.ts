@@ -16,15 +16,18 @@ export class ReviewService {
     private readonly myLibraryService: MyLibraryService,
     private readonly bookService: BookService,
   ) {}
-  async create(
-    createReviewDto: CreateReviewDto,
-    userId: number,
-  ): Promise<Review> {
-    const getMyLibrary = await this.myLibraryService.findOne(userId);
+  async create(createReviewDto: CreateReviewDto, req: any): Promise<Review> {
+    const userId = req.user.userId;
+    const role = req.user.role;
+    console.log(req.user);
+    let getMyLibrary;
+    if (role === 'user') {
+      getMyLibrary = await this.myLibraryService.getLibraryByUser(userId!);
+    }
     const getBook = await this.bookService.findOne(createReviewDto.bookId);
 
     const result = this.reviewRepository.create({
-      myLibrary: getMyLibrary,
+      myLibrary: getMyLibrary || null,
       book: getBook,
       description: createReviewDto.description,
       star: createReviewDto.star,
@@ -35,6 +38,7 @@ export class ReviewService {
   async findAll(
     paginationQueryDto: PaginationQueryDto,
     filters: any,
+    req: any,
   ): Promise<{ data: Review[]; pagination: any }> {
     let { page, order, limit, sortBy, allData } = paginationQueryDto;
     page = Number(page) || 1;
@@ -44,6 +48,19 @@ export class ReviewService {
     const sort: Record<string, 'ASC' | 'DESC'> = {
       [sortField]: order === 'asc' ? 'ASC' : 'DESC',
     };
+    const userId = req.user.userId;
+    const role = req.user.role;
+    const getMyLibrary =
+      role === 'user'
+        ? await this.myLibraryService.getLibraryByUser(userId)
+        : null;
+
+    if (role === 'user' && getMyLibrary) {
+      filters = {
+        ...filters,
+        myLibrary: { id: getMyLibrary.id },
+      };
+    }
 
     const { data, pagination } = await paginate<Review>(
       this.reviewRepository,

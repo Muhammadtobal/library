@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   forwardRef,
   Inject,
   Injectable,
@@ -14,6 +15,8 @@ import { paginate } from 'src/utils/paginate';
 import { basename, join } from 'path';
 import { unlink } from 'fs/promises';
 import { BookService } from 'src/book/book.service';
+import { saveImageManually } from 'src/utils/multer.options';
+import { unlinkSync } from 'fs';
 type AuthorWithImage = Author & { image: string | null | undefined } & {
   total: any;
 };
@@ -27,11 +30,15 @@ export class AuthorService {
   ) {}
   async create(
     createAuthorDto: CreateAuthorDto,
-    imageFile: string,
+    imageFile: Express.Multer.File,
   ): Promise<Author> {
+    if (imageFile === null || imageFile === undefined) {
+      throw new BadRequestException('the image null');
+    }
+    const fileName = saveImageManually('authors', 'author', imageFile);
     const result = await this.authorRepository.create({
       ...createAuthorDto,
-      image: imageFile,
+      image: fileName,
     });
     return await this.authorRepository.save(result);
   }
@@ -131,8 +138,9 @@ export class AuthorService {
   async update(
     id: number,
     updateAuthorDto: UpdateAuthorDto,
-    imagFile: string,
+    imagFile: Express.Multer.File,
   ): Promise<Author> {
+    console.log(updateAuthorDto);
     const getOne = await this.findOne(id);
     if (!updateAuthorDto) {
       return getOne;
@@ -140,29 +148,32 @@ export class AuthorService {
     if (!getOne) {
       throw new NotFoundException('the Author Not Found');
     }
-    if (imagFile && imagFile !== undefined) {
-      const oldImage = getOne.image;
+    if (imagFile) {
+      if (getOne.image) {
+        // استخراج اسم الملف من الرابط باستخدام basename
+        const oldImageFilename = basename(getOne.image);
 
-      if (oldImage) {
-        const imageName = basename(oldImage);
-        const imagePath = join(
+        const oldImagePath = join(
           __dirname,
           '..',
           '..',
           'uploads',
           'authors',
-          imageName,
+          oldImageFilename,
         );
 
         try {
-          await unlink(imagePath);
+          unlinkSync(oldImagePath);
         } catch (err) {
-          console.warn(`Failed to delete old image: ${imagePath}`, err);
+          console.warn(`Failed to delete old image: ${oldImagePath}`, err);
         }
       }
-      updateAuthorDto.image = imagFile;
+
+      const newFilename = saveImageManually('authors', 'author', imagFile);
+      const newName = basename(newFilename);
+      updateAuthorDto.image = newName;
     } else {
-      updateAuthorDto.image = getOne.image;
+      updateAuthorDto.image = basename(getOne.image as string);
     }
     const newUpdate = Object.assign(getOne, updateAuthorDto);
     return await this.authorRepository.save(newUpdate);
@@ -172,23 +183,25 @@ export class AuthorService {
     if (!getOne) {
       throw new NotFoundException('the Author Not Found');
     }
-    const oldImage = getOne.image;
-    if (oldImage) {
-      const imagePath = join(
+    if (getOne.image) {
+      const oldImageFilename = basename(getOne.image);
+
+      const oldImagePath = join(
         __dirname,
         '..',
         '..',
         'uploads',
         'authors',
-        oldImage,
+        oldImageFilename,
       );
 
       try {
-        await unlink(imagePath);
+        unlinkSync(oldImagePath);
       } catch (err) {
-        console.warn(`Failed to delete old image: ${imagePath}`, err);
+        console.warn(`Failed to delete old image: ${oldImagePath}`, err);
       }
     }
+
     await this.authorRepository.remove(getOne);
   }
 }

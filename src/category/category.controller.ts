@@ -8,6 +8,9 @@ import {
   Delete,
   Query,
   Put,
+  UseGuards,
+  ValidationPipe,
+  UsePipes,
 } from '@nestjs/common';
 import { CategoryService } from './category.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
@@ -15,12 +18,26 @@ import { UpdateCategoryDto } from './dto/update-category.dto';
 import { PaginationQueryDto } from 'src/utils/paginateDto';
 import { filter } from 'rxjs/operators';
 import { Category } from './entities/category.entity';
+import { AuthGuard } from '@nestjs/passport';
+import { RolesGuard } from 'src/common/guards/roles.guard';
+import { UserRole } from 'src/utils/types';
+import { Roles } from 'src/common/decorators/roles.decorator';
+import { User } from 'src/user/entities/user.entity';
 
 @Controller('categories')
 export class CategoryController {
   constructor(private readonly categoryService: CategoryService) {}
 
   @Post()
+  @Roles(UserRole.ADMIN)
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @UsePipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  )
   async create(@Body() createCategoryDto: CreateCategoryDto) {
     const result = await this.categoryService.create(createCategoryDto);
     return {
@@ -63,6 +80,8 @@ export class CategoryController {
   }
 
   @Put(':id')
+  @Roles(UserRole.ADMIN)
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
   async update(
     @Param('id') id: number,
     @Body() updateCategoryDto: UpdateCategoryDto,
@@ -76,6 +95,8 @@ export class CategoryController {
   }
 
   @Delete(':id')
+  @Roles(UserRole.ADMIN)
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
   async remove(@Param('id') id: number) {
     await this.categoryService.remove(id);
     return {

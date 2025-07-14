@@ -14,6 +14,8 @@ import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './auth/auth.module';
 import { MyLibraryModule } from './my-library/my-library.module';
 
+import { SaveBookModule } from './save-book/save-book.module';
+
 @Module({
   imports: [
     ConfigModule.forRoot({ isGlobal: true, envFilePath: '.env' }),
@@ -27,6 +29,8 @@ import { MyLibraryModule } from './my-library/my-library.module';
     AuthorModule,
     AuthModule,
     MyLibraryModule,
+
+    SaveBookModule,
   ],
   controllers: [AppController],
   providers: [AppService],

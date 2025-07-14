@@ -39,8 +39,7 @@ export async function paginate<T extends ObjectLiteral>(
     const pageNumber = Math.max(Number(page) || 1, 1);
     const skip = (pageNumber - 1) * limitNumber;
 
-    const alias = 'book'; // اسم الـ alias في الـ QueryBuilder
-
+    const alias = 'alias'; // اسم الـ alias في QueryBuilder
     const queryBuilder = repository.createQueryBuilder(alias);
 
     // join العلاقات
@@ -48,7 +47,7 @@ export async function paginate<T extends ObjectLiteral>(
       queryBuilder.leftJoinAndSelect(`${alias}.${relation}`, relation);
     });
 
-    // بناء شروط البحث (فلتر search عام على عدة حقول)
+    // فلتر البحث العام (search)
     if (filters.search) {
       const search = `%${filters.search.toLowerCase()}%`;
       queryBuilder.andWhere(
@@ -57,64 +56,64 @@ export async function paginate<T extends ObjectLiteral>(
       );
     }
 
-    // فلاتر أخرى (مثال: category, author)
+    // فلاتر مخصصة إضافية
     if (filters.category) {
       queryBuilder.andWhere('LOWER(category.name) LIKE :category', {
-        category: `%${filters.category()}%`,
+        category: `%${filters.category.toLowerCase()}%`,
       });
     }
 
-    if (filters.pageNumber) {
-      if (
-        filters.pageNumber.gte !== undefined &&
-        filters.pageNumber.lte !== undefined
-      ) {
-        queryBuilder.andWhere(`${alias}.pageNumber BETWEEN :gte AND :lte`, {
-          gte: filters.pageNumber.gte,
-          lte: filters.pageNumber.lte,
-        });
-      } else if (filters.pageNumber.lt !== undefined) {
-        queryBuilder.andWhere(`${alias}.pageNumber < :lt`, {
-          lt: filters.pageNumber.lt,
-        });
-      } else if (filters.pageNumber.gt !== undefined) {
-        queryBuilder.andWhere(`${alias}.pageNumber > :gt`, {
-          gt: filters.pageNumber.gt,
-        });
-      }
-    }
     if (filters.language) {
       queryBuilder.andWhere('LOWER(book.language) LIKE :language', {
         language: `%${filters.language.toLowerCase()}%`,
       });
     }
+
     if (filters.displayType) {
       queryBuilder.andWhere('LOWER(book.displayType) LIKE :displayType', {
         displayType: `%${filters.displayType.toLowerCase()}%`,
       });
     }
-    // ترتيب النتائج
+
+    // ✅ تطبيق الفلاتر العامة (يدعم العلاقات مثل myLibrary.id)
+    for (const key of Object.keys(filters)) {
+      const value = filters[key];
+
+      // تخطي الفلاتر التي تم معالجتها يدويًا أعلاه
+      if (['search', 'category', 'language', 'displayType'].includes(key))
+        continue;
+
+      if (typeof value === 'object' && value !== null && 'id' in value) {
+        // علاقة: مثل filters.myLibrary = { id: 3 }
+        queryBuilder.andWhere(`${key}.id = :${key}Id`, {
+          [`${key}Id`]: value.id,
+        });
+      } else {
+        // فلتر مباشر على حقل في الكيان الرئيسي
+        queryBuilder.andWhere(`${alias}.${key} = :${key}`, {
+          [key]: value,
+        });
+      }
+    }
+
+    // الترتيب
     if (Object.keys(sort).length) {
       for (const [field, order] of Object.entries(sort)) {
-        // مثلا: orderBy('entity.title', 'ASC')
         queryBuilder.addOrderBy(`${alias}.${field}`, order as 'ASC' | 'DESC');
       }
     } else {
-      // ترتيب افتراضي
       queryBuilder.addOrderBy(`${alias}.id`, 'ASC');
     }
 
-    // إجمالي عدد النتائج
+    // إجمالي النتائج
     const totalItems = await queryBuilder.getCount();
 
-    // Pagination
+    // التقييد بالصفحات
     if (!allData) {
       queryBuilder.skip(skip).take(limitNumber);
     }
 
-    // تنفيذ الاستعلام لجلب البيانات
     const data = await queryBuilder.getMany();
-
     const totalPages = Math.ceil(totalItems / limitNumber);
 
     return {

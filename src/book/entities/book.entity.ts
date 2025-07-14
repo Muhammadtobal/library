@@ -19,7 +19,17 @@ export class Book {
 
   @Column()
   title: string;
+  @Column()
+  subTitle: string;
+  @Column()
+  translator: string;
+  @Column({ type: 'datetime', nullable: true })
+  publicationDate: Date;
 
+  @Column()
+  publishingHouse: string;
+  @Column()
+  file?: string;
   @ManyToOne(() => Category, (category) => category.books, {
     onDelete: 'CASCADE',
   })
@@ -31,8 +41,7 @@ export class Book {
   })
   @JoinColumn()
   author: Author;
-  @Column()
-  size: string;
+
   @Column()
   language: string;
   @Column()

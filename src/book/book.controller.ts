@@ -10,26 +10,59 @@ import {
   Put,
   UseInterceptors,
   UploadedFile,
+  UseGuards,
+  UsePipes,
+  ValidationPipe,
+  UploadedFiles,
 } from '@nestjs/common';
 import { BookService } from './book.service';
 import { CreateBookDto } from './dto/create-book.dto';
 import { UpdateBookDto } from './dto/update-book.dto';
 import { PaginationQueryDto } from 'src/utils/paginateDto';
 import { read } from 'fs';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { uploadImage } from 'src/utils/multer.options';
+import {
+  FileFieldsInterceptor,
+  FileInterceptor,
+} from '@nestjs/platform-express';
+
+import { AuthGuard } from '@nestjs/passport';
+import { RolesGuard } from 'src/common/guards/roles.guard';
+import { uploadImageMemory } from 'src/utils/multer.options';
+import { UserRole } from 'src/utils/types';
+import { Roles } from 'src/common/decorators/roles.decorator';
 
 @Controller('books')
 export class BookController {
   constructor(private readonly bookService: BookService) {}
 
   @Post()
-  @UseInterceptors(FileInterceptor('image', uploadImage('books', 'book')))
+  @Roles(UserRole.ADMIN, UserRole.User)
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @UsePipes(
+    new ValidationPipe({
+      whitelist: true,
+      forbidNonWhitelisted: true,
+      transform: true,
+    }),
+  )
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        { name: 'image', maxCount: 1 },
+        { name: 'file', maxCount: 1 },
+      ],
+      uploadImageMemory(),
+    ),
+  )
   async create(
     @Body() createBookDto: CreateBookDto,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFiles()
+    files: {
+      image?: Express.Multer.File[];
+      file?: Express.Multer.File[];
+    },
   ) {
-    const result = await this.bookService.create(createBookDto, file?.filename);
+    const result = await this.bookService.create(createBookDto, files);
 
     return {
       message: 'book created successfully',
@@ -67,17 +100,27 @@ export class BookController {
   }
 
   @Put(':id')
-  @UseInterceptors(FileInterceptor('image', uploadImage('books', 'book')))
+  @Roles(UserRole.ADMIN)
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @UseInterceptors(
+    FileFieldsInterceptor(
+      [
+        { name: 'image', maxCount: 1 },
+        { name: 'file', maxCount: 1 },
+      ],
+      uploadImageMemory(),
+    ),
+  )
   async update(
     @Param('id') id: number,
     @Body() updateBookDto: UpdateBookDto,
-    @UploadedFile() file: Express.Multer.File,
+    @UploadedFiles()
+    files: {
+      image?: Express.Multer.File[];
+      file?: Express.Multer.File[];
+    },
   ) {
-    const result = await this.bookService.update(
-      id,
-      updateBookDto,
-      file?.filename,
-    );
+    const result = await this.bookService.update(id, updateBookDto, files);
     return {
       message: 'book updated successfully',
       success: true,
@@ -86,6 +129,8 @@ export class BookController {
   }
 
   @Delete(':id')
+  @Roles(UserRole.ADMIN)
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
   async remove(@Param('id') id: number) {
     await this.bookService.remove(id);
     return {

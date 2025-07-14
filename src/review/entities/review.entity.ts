@@ -15,7 +15,7 @@ export class Review {
     onDelete: 'CASCADE',
   })
   @JoinColumn()
-  myLibrary: MyLibrary;
+  myLibrary: MyLibrary | null;
   @ManyToOne(() => Book, (book) => book.reviews, { onDelete: 'CASCADE' })
   @JoinColumn()
   book: Book;

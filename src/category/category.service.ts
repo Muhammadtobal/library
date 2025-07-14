@@ -71,7 +71,6 @@ export class CategoryService {
     }
     const ratedBooks = await this.bookService.countBook(getOne.books);
 
-    // دمج التقييمات مع الكتب
     let booksWithRating = ratedBooks.AllBooks.map((item) => ({
       ...item.book,
       averageRating: item.averageRating,

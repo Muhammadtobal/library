@@ -6,28 +6,29 @@ import {
   Patch,
   Param,
   Delete,
-  Request,
   UseGuards,
+  Request,
   Query,
   Put,
-  UsePipes,
   ValidationPipe,
+  UsePipes,
 } from '@nestjs/common';
-import { ReviewService } from './review.service';
-import { CreateReviewDto } from './dto/create-review.dto';
-import { UpdateReviewDto } from './dto/update-review.dto';
+import { SaveBookService } from './save-book.service';
+import { CreateSaveBookDto } from './dto/create-save-book.dto';
+import { UpdateSaveBookDto } from './dto/update-save-book.dto';
 import { AuthGuard } from '@nestjs/passport';
-import { UserRole } from 'src/utils/types';
-import { PaginationQueryDto } from 'src/utils/paginateDto';
 import { RolesGuard } from 'src/common/guards/roles.guard';
+import { PaginationQueryDto } from 'src/utils/paginateDto';
 import { Roles } from 'src/common/decorators/roles.decorator';
+import { UserRole } from 'src/utils/types';
 
-@Controller('reviews')
-export class ReviewController {
-  constructor(private readonly reviewService: ReviewService) {}
+@Controller('save-books')
+export class SaveBookController {
+  constructor(private readonly saveBookService: SaveBookService) {}
+
   @Post()
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles(UserRole.ADMIN, UserRole.User)
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
   @UsePipes(
     new ValidationPipe({
       whitelist: true,
@@ -35,10 +36,13 @@ export class ReviewController {
       transform: true,
     }),
   )
-  async create(@Body() createReviewDto: CreateReviewDto, @Request() req) {
-    const data = await this.reviewService.create(createReviewDto, req);
+  async create(
+    @Body() createSaveBookDto: CreateSaveBookDto,
+    @Request() req: any,
+  ) {
+    const data = await this.saveBookService.create(createSaveBookDto, req);
     return {
-      message: 'Review Created Successfully',
+      message: 'save book successfully',
       success: true,
       data: data,
     };
@@ -49,20 +53,20 @@ export class ReviewController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   async findAll(
     @Query() paginationQueryDto: PaginationQueryDto,
-    @Query() queryParam: any,
-    @Request() req,
+    @Param() queryParam: any,
+    @Request() req: any,
   ) {
-    const { order, sortBy, page, limit, ...filters } = queryParam;
-    const { data, pagination } = await this.reviewService.findAll(
+    const { limit, page, sortBy, order, ...filters } = queryParam;
+    const { data, pagination } = await this.saveBookService.findAll(
       paginationQueryDto,
       filters,
       req,
     );
     return {
-      message: 'reviews fetched successfully',
+      message: 'fetched  all your book successfully',
       success: true,
       data: data,
-      pagination: pagination,
+      paginate: pagination,
     };
   }
 
@@ -70,9 +74,9 @@ export class ReviewController {
   @Roles(UserRole.ADMIN, UserRole.User)
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   async findOne(@Param('id') id: number) {
-    const data = await this.reviewService.findOne(id);
+    const data = await this.saveBookService.findOne(id);
     return {
-      message: 'review fetched successfully',
+      message: 'fetched  all your book successfully',
       success: true,
       data: data,
     };
@@ -83,11 +87,11 @@ export class ReviewController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   async update(
     @Param('id') id: number,
-    @Body() updateReviewDto: UpdateReviewDto,
+    @Body() updateSaveBookDto: UpdateSaveBookDto,
   ) {
-    const data = await this.reviewService.update(id, updateReviewDto);
+    const data = await this.saveBookService.update(id, updateSaveBookDto);
     return {
-      message: 'review updated successfully',
+      message: 'update   your bookSave successfully',
       success: true,
       data: data,
     };
@@ -96,10 +100,10 @@ export class ReviewController {
   @Delete(':id')
   @Roles(UserRole.ADMIN, UserRole.User)
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  async remove(@Param('id') id: number) {
-    await this.reviewService.remove(id);
+  async remove(@Param('id') id: number, @Request() req: any) {
+    await this.saveBookService.remove(id, req);
     return {
-      message: 'review deleted successfully',
+      message: 'deleted book successfully',
       success: true,
     };
   }

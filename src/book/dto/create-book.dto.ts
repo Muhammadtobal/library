@@ -1,28 +1,61 @@
-import { IsString, IsNotEmpty, IsNumber, IsOptional } from 'class-validator';
+import {
+  IsString,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  IsDateString,
+  IsEnum,
+} from 'class-validator';
+import { Type } from 'class-transformer';
+import { DisplayType } from 'src/utils/types';
 
 export class CreateBookDto {
   @IsString()
   @IsNotEmpty()
   title!: string;
 
+  @Type(() => Number)
   @IsNumber()
   categoryId!: number;
-  @IsOptional()
+
   @IsString()
+  @IsOptional()
   image?: string;
+
+  @Type(() => Number)
   @IsNumber()
   authorId!: number;
-  @IsOptional()
+
   @IsString()
   bio?: string;
-  @IsOptional()
+
   @IsString()
   language?: string;
-  @IsOptional()
-  @IsString()
-  size?: string;
 
+  @Type(() => Number)
   @IsNumber()
   @IsNotEmpty()
   Number_pages!: number;
+
+  @IsOptional()
+  @IsString()
+  subTitle?: string;
+
+  @IsOptional()
+  @IsString()
+  translator?: string;
+
+  @IsOptional()
+  @IsDateString()
+  publicationDate?: string;
+
+  @IsOptional()
+  @IsString()
+  publishingHouse?: string;
+
+  @IsString()
+  @IsOptional()
+  file?: string;
+  @IsEnum(DisplayType)
+  displayType?: DisplayType;
 }

@@ -12,7 +12,7 @@ import {
 export class MyLibrary {
   @PrimaryGeneratedColumn()
   id: number;
-  @OneToOne(() => User, (user) => user.myLibrary)
+  @OneToOne(() => User, (user) => user.myLibrary, { onDelete: 'CASCADE' })
   @JoinColumn()
   user: User;
   @OneToMany(() => Review, (review) => review.myLibrary)

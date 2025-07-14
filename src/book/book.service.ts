@@ -19,6 +19,8 @@ import { basename, join } from 'path';
 import { unlink } from 'fs/promises';
 import * as path from 'path';
 import { promises } from 'dns';
+import { saveFileManually, saveImageManually } from 'src/utils/multer.options';
+import { unlinkSync } from 'fs';
 
 @Injectable()
 export class BookService {
@@ -33,24 +35,48 @@ export class BookService {
   ) {}
   async create(
     createBookDto: CreateBookDto,
-    imageFile: string,
-  ): Promise<Book | null> {
+    files: {
+      image?: Express.Multer.File[];
+      file?: Express.Multer.File[];
+    },
+  ): Promise<Book> {
     const category = await this.categoryService.findOne(
       createBookDto.categoryId,
     );
-
     const author = await this.authorService.findOne(createBookDto.authorId);
-    const { books, ...authorWithOutBook } = author;
+
+    if (!files?.image?.[0]) {
+      throw new BadRequestException('Image is required');
+    }
+
+    if (!files?.file?.[0]) {
+      throw new BadRequestException('File (PDF) is required');
+    }
+
+    const imageFile = files.image[0];
+    const pdfFile = files.file[0];
+
+    const savedImage = saveImageManually('books/images', 'book', imageFile);
+    const savedPdf = saveFileManually('books/files', 'book', pdfFile);
+
+    const { books, ...authorWithoutBooks } = author;
+
     const newBook = this.bookRepository.create({
-      Number_pages: createBookDto.Number_pages,
-      size: createBookDto.size,
-      bio: createBookDto.bio,
-      language: createBookDto.language,
       title: createBookDto.title,
-      author: authorWithOutBook,
-      category: category,
-      image: imageFile,
+      subTitle: createBookDto.subTitle,
+      translator: createBookDto.translator,
+      publicationDate: createBookDto.publicationDate,
+      publishingHouse: createBookDto.publishingHouse,
+      Number_pages: createBookDto.Number_pages,
+      language: createBookDto.language,
+      bio: createBookDto.bio,
+      displayType: createBookDto.displayType,
+      author: authorWithoutBooks,
+      category,
+      image: savedImage,
+      file: savedPdf,
     });
+
     return await this.bookRepository.save(newBook);
   }
 
@@ -61,41 +87,13 @@ export class BookService {
     let { order, sortBy, page, limit, allData } = paginationQueryDto;
     page = Number(page) || 1;
     limit = Number(limit) || 10;
-    const sortField = sortBy || 'id';
+    const isSortByRating = sortBy === 'averageRating';
+    const sortField = !isSortByRating ? sortBy || 'id' : 'id';
 
     const sort: Record<string, 'ASC' | 'DESC'> = {
       [sortField]: order === 'asc' ? 'ASC' : 'DESC',
     };
-    const queryBuilder = this.bookRepository
-      .createQueryBuilder('book')
-      .leftJoinAndSelect('book.category', 'category')
-      .leftJoinAndSelect('book.author', 'author');
-    if (filters?.search) {
-      const search = `%${filters.search.toLowerCase()}%`;
-      queryBuilder.andWhere(
-        `(LOWER(book.title) LIKE :search OR LOWER(author.name) LIKE :search OR LOWER(category.name) LIKE :search)`,
-        { search },
-      );
-    }
 
-    // 🔍 تطبيق الفلاتر
-    // if (filters?.title) {
-    //   queryBuilder.andWhere('LOWER(book.title) LIKE :title', {
-    //     title: `%${filters.title.toLowerCase()}%`,
-    //   });
-    // }
-
-    // if (filters?.category) {
-    //   queryBuilder.andWhere('LOWER(category.name) LIKE :category', {
-    //     category: `%${filters.category.toLowerCase()}%`,
-    //   });
-    // }
-
-    // if (filters?.author) {
-    //   queryBuilder.andWhere('LOWER(author.name) LIKE :author', {
-    //     author: `%${filters.author.toLowerCase()}%`,
-    //   });
-    // }
     const { data, pagination } = await paginate<Book>(
       this.bookRepository,
       ['category', 'author'],
@@ -107,11 +105,24 @@ export class BookService {
     );
     const host = process.env.APP_URL || 'http://localhost';
     const port = process.env.PORT || 3000;
-    const books = await this.countBook(data);
-    const updateData = books.AllBooks.map((i) => ({
+    const booksWithRating = await this.countBook(data);
+    let sortedBooks = booksWithRating.AllBooks;
+
+    if (isSortByRating) {
+      sortedBooks = sortedBooks.sort((a, b) =>
+        order === 'asc'
+          ? a.averageRating - b.averageRating
+          : b.averageRating - a.averageRating,
+      );
+    }
+    const updateData = sortedBooks.map((i) => ({
       ...i.book,
       image: i.book.image
-        ? `${host}:${port}/uploads/books/${i.book.image}`
+        ? `${host}:${port}/uploads/books/images/${i.book.image}`
+        : undefined,
+
+      file: i.book.file
+        ? `${host}:${port}/uploads/books/files/${i.book.file}`
         : undefined,
       averageRating: i.averageRating,
     }));
@@ -131,19 +142,24 @@ export class BookService {
     const port = process.env.PORT || 3000;
     const object = {
       ...getOne,
-      image: getOne
-        ? `${host}:${port}/uploads/books/${getOne.image}`
+      image: getOne.image
+        ? `${host}:${port}/uploads/books/images/${getOne.image}`
+        : undefined,
+      file: getOne.file
+        ? `${host}:${port}/uploads/books/files/${getOne.file}`
         : undefined,
     };
+
     return object;
   }
 
   async update(
     id: number,
     updateBookDto: UpdateBookDto,
-    imagFile: string,
+    files: { image?: Express.Multer.File[]; file?: Express.Multer.File[] },
   ): Promise<Book> {
     const getOne = await this.findOne(id);
+
     if (!updateBookDto) {
       return getOne;
     }
@@ -158,32 +174,58 @@ export class BookService {
       const author = await this.authorService.findOne(updateBookDto.authorId);
       getOne.author = author;
     }
-    if (imagFile && imagFile !== undefined) {
-      const oldImage = getOne.image;
-      if (oldImage) {
-        const fileName = path.basename(oldImage);
-        const imagePath = join(
+
+    // تفكيك الملفات داخل الخدمة
+    const imageFile = files.image ? files.image[0] : null;
+    const pdfFile = files.file ? files.file[0] : null;
+
+    if (imageFile) {
+      if (getOne.image) {
+        const oldImageFilename = basename(getOne.image);
+        const oldImagePath = join(
           __dirname,
           '..',
           '..',
           'uploads',
-          'books',
-          fileName,
-        );
+          'books/images',
 
+          oldImageFilename,
+        );
         try {
-          await unlink(imagePath);
+          unlinkSync(oldImagePath);
         } catch (err) {
-          throw new BadRequestException(
-            `Failed to delete old image: ${imagePath}`,
-            err,
-          );
+          console.warn(`Failed to delete old image: ${oldImagePath}`, err);
         }
       }
-      updateBookDto.image = imagFile;
+      const newImageName = saveImageManually('books/images', 'book', imageFile);
+      updateBookDto.image = newImageName;
     } else {
-      updateBookDto.image = getOne.image;
+      updateBookDto.image = basename(getOne.image as string);
     }
+
+    if (pdfFile) {
+      if (getOne.file) {
+        const oldPdfFilename = basename(getOne.file);
+        const oldPdfPath = join(
+          __dirname,
+          '..',
+          '..',
+          'uploads',
+          'books/files',
+          oldPdfFilename,
+        );
+        try {
+          unlinkSync(oldPdfPath);
+        } catch (err) {
+          console.warn(`Failed to delete old pdf file: ${oldPdfPath}`, err);
+        }
+      }
+      const newPdfName = saveFileManually('books/files', 'book', pdfFile);
+      updateBookDto.file = newPdfName;
+    } else {
+      updateBookDto.file = getOne.file;
+    }
+
     const { categoryId, authorId, ...newUpdate } = updateBookDto;
     const newSave = Object.assign(getOne, newUpdate);
     return await this.bookRepository.save(newSave);
@@ -191,24 +233,41 @@ export class BookService {
 
   async remove(id: number): Promise<void> {
     const getOne = await this.findOne(id);
-    const oldImage = getOne.image;
-    if (oldImage) {
-      const imageFile = basename(oldImage);
-      const imagePath = join(
+    if (getOne.image) {
+      const oldImageFilename = basename(getOne.image);
+
+      const oldImagePath = join(
         __dirname,
         '..',
         '..',
         'uploads',
-        'books',
-        imageFile,
+        'books/images',
+        oldImageFilename,
       );
 
       try {
-        await unlink(imagePath);
+        unlinkSync(oldImagePath);
       } catch (err) {
-        console.warn(`Failed to delete old image: ${imagePath}`, err);
+        console.warn(`Failed to delete old image: ${oldImagePath}`, err);
       }
     }
+    if (getOne.file) {
+      const oldPdfFilename = basename(getOne.file);
+      const oldPdfPath = join(
+        __dirname,
+        '..',
+        '..',
+        'uploads',
+        'books/files',
+        oldPdfFilename,
+      );
+      try {
+        unlinkSync(oldPdfPath);
+      } catch (err) {
+        console.warn(`Failed to delete old pdf file: ${oldPdfPath}`, err);
+      }
+    }
+
     await this.bookRepository.delete(id);
   }
   async countBook(getBooks: any) {
