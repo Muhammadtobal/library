@@ -1,4 +1,8 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { AuthService } from '../auth.service';
 import { User } from 'src/user/entities/user.entity';
 import { PassportStrategy } from '@nestjs/passport';
@@ -17,6 +21,9 @@ export class LocalStrategy extends PassportStrategy(Strategy) {
     email: string,
     password: string,
   ): Promise<Omit<User, 'password'>> {
+    if ((password = '')) {
+      throw new BadRequestException('pleas provide password');
+    }
     const user = await this.authService.validateUser(email, password);
     if (!user) {
       throw new UnauthorizedException('Email or password is incorrect');

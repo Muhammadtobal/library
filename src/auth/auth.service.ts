@@ -12,6 +12,7 @@ import { CreateUserDto } from 'src/user/dto/create-user.dto';
 import { UserRole } from 'src/utils/types';
 import { MyLibraryService } from 'src/my-library/my-library.service';
 import { CreateMyLibraryDto } from 'src/my-library/dto/create-my-library.dto';
+import { UserService } from 'src/user/user.service';
 @Injectable()
 export class AuthService {
   constructor(
@@ -19,6 +20,7 @@ export class AuthService {
     private readonly userRepository: Repository<User>,
 
     private readonly jwtService: JwtService,
+    private readonly userService: UserService,
     private readonly myLibraryService: MyLibraryService,
   ) {}
 
@@ -59,5 +61,12 @@ export class AuthService {
     return {
       access_token: this.jwtService.sign(payload, { expiresIn: '30d' }),
     };
+  }
+  async validateGoogle(googleUser: CreateUserDto) {
+    const getUser = await this.userRepository.findOne({
+      where: { email: googleUser.email },
+    });
+    if (getUser) return getUser;
+    return this.register(googleUser);
   }
 }

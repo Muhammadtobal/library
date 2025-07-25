@@ -6,11 +6,16 @@ import {
   Controller,
   UsePipes,
   ValidationPipe,
+  Get,
+  Res,
+  Req,
 } from '@nestjs/common';
 import { CreateUserDto } from 'src/user/dto/create-user.dto';
 import { AuthService } from './auth.service';
 import { LocalAuthGuard } from './local-auth.guard';
 import { ApiTags } from '@nestjs/swagger';
+import { AuthGuard } from '@nestjs/passport';
+import { GoogleAuthGuard } from './guards/google-auth/google-auth.guard';
 @ApiTags('Authentication')
 @Controller('auth')
 export class AuthController {
@@ -43,5 +48,20 @@ export class AuthController {
       message: 'success',
       data: result,
     };
+  }
+
+  @UseGuards(GoogleAuthGuard)
+  @Get('google/login')
+  async googleLogin() {
+    // Google redirect will happen here
+  }
+
+  @UseGuards(GoogleAuthGuard)
+  @Get('google/callBack')
+  async googleCallBack(@Req() req, @Res() res) {
+    const respons = await this.authService.login(req.user);
+    res.json({
+      token: respons.access_token,
+    });
   }
 }
